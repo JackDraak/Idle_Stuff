@@ -98,20 +98,20 @@ class NCursesDisplay:
                 key = self.stdscr.getch()
                 if key != -1:  # Valid key pressed
                     self.input_queue.put(key)
-                time.sleep(0.05)  # Small delay to prevent CPU spinning
+                time.sleep(0.02)  # Smaller delay for better responsiveness
             except:
                 break
     
     def render(self, game_data):
         """Render complete game state"""
         try:
+            # Update selectable items first
+            self._update_selectable_items(game_data)
+            
             # Clear all windows
             for window in self.windows.values():
                 window.clear()
                 window.box()
-            
-            # Update selectable items
-            self._update_selectable_items(game_data)
             
             # Render each section
             self._render_header(game_data)
@@ -120,11 +120,12 @@ class NCursesDisplay:
             self._render_events(game_data)
             self._render_controls()
             
-            # Refresh all windows
+            # Refresh all windows at once
             for window in self.windows.values():
-                window.refresh()
+                window.noutrefresh()  # Stage refresh without immediate update
             
-            self.stdscr.refresh()
+            # Update screen once
+            curses.doupdate()  # Actually update the terminal
             
         except curses.error:
             # Handle terminal resize or other display errors gracefully

@@ -512,28 +512,35 @@ class IdleStuffGame:
     def run(self):
         """Main game loop with interactive controls"""
         self.running = True
+        last_render_time = 0
+        render_interval = 0.1  # Only redraw 10 times per second max
         
         try:
             while self.running:
-                # Process game tick
-                tick_data = self.logic.tick()
+                current_time = time.time()
                 
-                # Add boost message to events if present
-                if self.last_boost_message:
-                    tick_data['events'].append({
-                        'type': 'player',
-                        'message': self.last_boost_message
-                    })
-                    self.last_boost_message = ""
-                
-                # Render display
-                self.display.render(tick_data)
-                
-                # Handle player input
+                # Handle player input (check frequently for responsiveness)
                 self._handle_input()
                 
-                # Wait for next tick
-                time.sleep(self.tick_rate)
+                # Process game tick and render less frequently
+                if current_time - last_render_time >= render_interval:
+                    # Process game tick
+                    tick_data = self.logic.tick()
+                    
+                    # Add boost message to events if present
+                    if self.last_boost_message:
+                        tick_data['events'].append({
+                            'type': 'player',
+                            'message': self.last_boost_message
+                        })
+                        self.last_boost_message = ""
+                    
+                    # Render display
+                    self.display.render(tick_data)
+                    last_render_time = current_time
+                
+                # Small sleep to prevent CPU spinning
+                time.sleep(0.02)
                 
         except KeyboardInterrupt:
             self.running = False
@@ -542,28 +549,36 @@ class IdleStuffGame:
     
     def _handle_input(self):
         """Process player input commands"""
-        cmd = self.display.get_input()
+        # Process multiple inputs per frame if available
+        inputs_processed = 0
+        max_inputs_per_frame = 5
         
-        if not cmd:
-            return
-        
-        if cmd == "quit":
-            self.running = False
-        elif cmd == "save":
-            self.logic.save_game()
-            self.last_boost_message = "Game saved manually!"
-        elif cmd.startswith("boost:"):
-            entity_id = cmd.split(":", 1)[1]
-            result = self.logic.apply_player_boost(entity_id)
-            self.last_boost_message = result
-        elif cmd == "speed_up":
-            self.tick_rate = max(0.1, self.tick_rate * 0.8)
-            self.last_boost_message = f"Game speed increased (tick: {self.tick_rate:.1f}s)"
-        elif cmd == "speed_down":
-            self.tick_rate = min(5.0, self.tick_rate * 1.25)
-            self.last_boost_message = f"Game speed decreased (tick: {self.tick_rate:.1f}s)"
-        elif cmd == "reset":
-            self.last_boost_message = "Selection reset"
+        while inputs_processed < max_inputs_per_frame:
+            cmd = self.display.get_input()
+            
+            if not cmd:
+                break
+                
+            inputs_processed += 1
+            
+            if cmd == "quit":
+                self.running = False
+            elif cmd == "save":
+                self.logic.save_game()
+                self.last_boost_message = "Game saved manually!"
+            elif cmd.startswith("boost:"):
+                entity_id = cmd.split(":", 1)[1]
+                result = self.logic.apply_player_boost(entity_id)
+                self.last_boost_message = result
+            elif cmd == "speed_up":
+                self.tick_rate = max(0.1, self.tick_rate * 0.8)
+                self.last_boost_message = f"Game speed increased (tick: {self.tick_rate:.1f}s)"
+            elif cmd == "speed_down":
+                self.tick_rate = min(5.0, self.tick_rate * 1.25)
+                self.last_boost_message = f"Game speed decreased (tick: {self.tick_rate:.1f}s)"
+            elif cmd in ["reset", "nav_up", "nav_down"]:
+                # Navigation commands don't need feedback messages
+                pass
     
     def _shutdown(self):
         """Clean shutdown with save"""
